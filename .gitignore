@@ -1,0 +1,6 @@
+.vscode
+rl_plans/RL\ Plan
+*.csv
+*.pdf
+*.png
+*.svg
