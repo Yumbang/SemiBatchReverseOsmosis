@@ -90,7 +90,7 @@
         # Energy-related variables
         Power_circ_pump(t)
         Power_HPP(t)
-        SEC(t)
+        SEC(t)  # Ws/m³
     end
 
     # D() means differential with t

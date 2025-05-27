@@ -167,13 +167,17 @@ function calculate_new_para(par, new_op_par)
     ]
 end
 
-function update_parameters(sys, problem, setp_handle, new_op_var, last_u; dt)
+function update_parameters(sys, problem, setp_handle, new_op_var, last_u; dt, reset_tspan=false)
     sbro_var        = deepcopy(last_u)
     sbro_param      = parameter_values(problem)
     sbro_param_new  = calculate_new_para(sbro_param.tunable, new_op_var)
 
-    tspan_old       = problem.tspan
-    tspan_new       = (tspan_old[2], tspan_old[2]+dt)
+    if reset_tspan
+        tspan_new       = (0.0, dt)
+    else
+        tspan_old       = problem.tspan
+        tspan_new       = (tspan_old[2], tspan_old[2]+dt)
+    end
 
     setp_handle(sbro_param, sbro_param_new)
     problem.ps[Initial.(unknowns(sys))] = sbro_var

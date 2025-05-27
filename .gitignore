@@ -4,3 +4,4 @@ rl_plans/RL\ Plan
 *.pdf
 *.png
 *.svg
+*.DS_Store

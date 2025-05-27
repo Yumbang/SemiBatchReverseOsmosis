@@ -52,6 +52,8 @@ function generate_C_feed_scenario(μ_C, σ_C; dt, len_episode, rng=Random.GLOBAL
     return concentration
 end
 
-function generate_objectives_scenario()
-
+function generate_objectives_scenario(low_τ_obj, high_τ_obj, low_V_perm_obj, high_V_perm_obj, rng=Random.GLOBAL_RNG)
+    τ_obj      = rand(rng) * (high_τ_obj      - low_τ_obj)      + low_τ_obj
+    V_perm_obj = rand(rng) * (high_V_perm_obj - low_V_perm_obj) + low_V_perm_obj
+    return (τ_obj, V_perm_obj)
 end
