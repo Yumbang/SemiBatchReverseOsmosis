@@ -1,5 +1,6 @@
 .vscode
 rl_plans/RL\ Plan
+env_figures
 *.csv
 *.pdf
 *.png
