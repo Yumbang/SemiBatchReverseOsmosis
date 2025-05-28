@@ -58,4 +58,15 @@ reset_scenario!(sbro_env,
 exp_reset = reset!(sbro_env, nothing, nothing; dt=dt)
 exp_step = step!(sbro_env, [5.0, 0.5, 0.0])  # [Q₀, R_sp, mode]
 ```
+### HTTP Server Interface
+```bash
+julia -t N_THREADS http_json_api_loop.jl
+```
+TIP: increasing N_THREADS from 1 to 2 greatly improves the performance, even though core ODE solving is not affected by N_THREADS. Maybe it is due to async IO handling of HTTP.jl.
 
+The server provides endpoints for:
+
+- POST /reset_scenario: Set scenario conditions
+- POST /reset: Reset environment
+- POST /step: Execute environment step
+- GET /render: Get environment state
