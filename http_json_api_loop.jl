@@ -34,12 +34,12 @@ function reset_handler(req::HTTP.Request)
     initial_condition = cfg["action"]    |> Vector{Float64}
 
     if isnothing(cfg["u_initial"]) 
-        u_initial         = cfg["u_initial"]
+        u_initial = cfg["u_initial"]
     else
-        u_initial         = cfg["u_initial"] |> Vector{Float64}
+        u_initial = cfg["u_initial"] |> Vector{Float64}
     end
 
-    dt                = cfg["dt"] |> Float64
+    dt = cfg["dt"] |> Float64
 
     experience_reset  = reset!(sbro_env, initial_condition, u_initial; dt=dt)
 
@@ -49,7 +49,7 @@ end
 function step_handler(req::HTTP.Request)
     cfg = JSON3.read(String(req.body))
 
-    action = cfg["action"]  |> Vector{Float64}
+    action = cfg["action"] |> Vector{Float64}
 
     experience_step  = step!(sbro_env, action)
 
@@ -59,11 +59,21 @@ end
 function render_handler(req::HTTP.Request)
     cfg = JSON3.read(String(req.body))
 
-    mode = cfg["mode"]  |> Symbol
+    mode = cfg["mode"] |> Symbol
 
-    rendered_env  = render(sbro_env; mode=mode)
+    rendered_env = render(sbro_env; mode=mode)
 
     return HTTP.Response(200, rendered_env)
+end
+
+function health_check_handler(req::HTTP.Request)
+    return HTTP.Response(200, "ok")
+end
+
+function cleanup()
+    @info "Server termination detected. Cleaning up ..."
+    sbro_env = nothing
+    return nothing
 end
 
 HTTP.register!(ROUTER, "POST", "/reset_scenario", reset_scenario_handler)
@@ -74,4 +84,27 @@ HTTP.register!(ROUTER, "POST", "/step", step_handler)
 
 HTTP.register!(ROUTER, "GET", "/render", render_handler)
 
-HTTP.serve(ROUTER, "127.0.0.1", 8081)
+HTTP.register!(ROUTER, "GET", "/health", health_check_handler)
+
+HTTP.serve(ROUTER, "127.0.0.1", 8081; on_shutdown = cleanup)
+
+# ─── Install signal handlers ─────────────────────────────────────────────────
+using Base: Signal, SIGINT, SIGTERM
+
+# Helper to watch one signal
+function watch_signal(sig::Int)
+    ch = Signal(sig)
+    @async while true
+        take!(ch)                      # blocks until that OS signal arrives
+        @info "Signal $(sig) received—shutting down HTTP server"
+        HTTP.close(server)             # start graceful shutdown
+        return                         # exit this task
+    end
+end
+
+watch_signal(SIGINT)                  # Ctrl-C
+watch_signal(SIGTERM)                 # `kill` or Docker stop
+
+# ─── Wait for server to finish shutting down ─────────────────────────────────
+wait(server)                          # blocks until `close(server)` is done
+@info "Server has shut down cleanly."

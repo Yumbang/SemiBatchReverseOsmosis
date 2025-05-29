@@ -90,8 +90,8 @@ begin
     end
 end
 
-exp_array[1]
-sbro_env
+@show exp_array[1]
+@show sbro_env
 
 using Plots
 obs_plots = []
@@ -108,14 +108,15 @@ obs_vars = [
     "τ_remaining"
     "V_perm_remaining"
 ]
+
 for idx in 1:11
     temp_plt = plot([elem[:observation][idx] for elem in exp_array], label=obs_vars[idx], framestyle=:box)
     push!(obs_plots, temp_plt)
-    savefig(temp_plt, "env_figures/$(obs_vars[idx]).pdf")
+    savefig(temp_plt, "../env_figures/$(obs_vars[idx]).pdf")
     # display(temp_plt)
 end
 obs_plot = plot(obs_plots..., size=(1800, 1200), suptitle="Observation variables of Semi-Batch RO Environment")
-savefig(obs_plot, "env_figures/obs_plot.pdf")
+savefig(obs_plot, "../env_figures/obs_plot.pdf")
 
 
 sbro_env

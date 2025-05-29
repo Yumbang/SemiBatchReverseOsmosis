@@ -41,6 +41,8 @@ resp_render = HTTP.get(BASE_URL*"/render",
     ["Content-Type" => "application/json"],
     JSON3.write(Dict("mode" => "text")))
 
+resp_health = HTTP.get(BASE_URL*"/health")
+
 status       = resp_render.status
 rendered_env = String(resp_render.body) |> print
 
@@ -87,3 +89,10 @@ end #  Time  (mean ± σ):   4.460 ms ± 966.078 μs   <THREAD = 1>
     rendered_env = String(resp_render.body)
 end #  Time  (mean ± σ):   262.658 μs ± 31.451 μs <THREAD = 1>
     #  Time  (mean ± σ):   128.903 μs ± 38.247 μs <THREAD = 2>
+
+@benchmark begin
+    resp_health = HTTP.get(BASE_URL*"/health")
+    status = resp_health.status
+    health = resp_health.body |> String
+end #  Time  (mean ± σ):   216.172 μs ± 81.038 μs <THREAD = 1>
+    #  Time  (mean ± σ):   85.569 μs ± 46.613 μs  <THREAD = 2> 
