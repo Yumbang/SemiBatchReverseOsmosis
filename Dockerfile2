@@ -1,0 +1,44 @@
+###############################################################################
+# build stage
+###############################################################################
+FROM julia:1.11.5-bookworm AS build
+
+# ── 1. install a minimal compiler tool-chain ────────────────────────────────
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        build-essential          # gcc, g++, make, libc6-dev …
+    # you can remove docs & cache to shrink the layer a bit
+    # && rm -rf /var/lib/apt/lists/*
+
+# ── 2. normal Julia stuff ───────────────────────────────────────────────────
+WORKDIR /app
+ENV JULIA_PROJECT=/app
+
+COPY Manifest.toml Project.toml ./
+RUN julia -e 'using Pkg; Pkg.add("PackageCompiler"); Pkg.instantiate()'
+
+# your source code
+COPY core              /app/core
+COPY rl_env_components /app/rl_env_components
+COPY rl_plans          /app/rl_plans
+COPY http_json_api_loop.jl /app/
+
+RUN julia --project -e 'using PackageCompiler; \
+    create_sysimage(["HTTP","JSON3","StatsBase","Unitful","ModelingToolkit", \
+                     "SymbolicIndexingInterface","PreallocationTools","OrdinaryDiffEq"], \
+                     sysimage_path="sbro_sysimage.so", \
+                     )'
+
+###############################################################################
+# runtime stage – no compiler needed here
+###############################################################################
+FROM julia:1.11.5-bookworm
+
+WORKDIR /app
+COPY --from=build /usr/local/julia /usr/local/julia
+COPY --from=build /app/sbro_sysimage.so /app/
+COPY --from=build /app/http_json_api_loop.jl /app/
+
+ENV JULIA_PROJECT=/app
+EXPOSE 8081
+CMD ["julia","--sysimage","sbro_sysimage.so","http_json_api_loop.jl"]
