@@ -30,15 +30,22 @@ RUN julia --project -e 'using PackageCompiler; \
                      )'
 
 ###############################################################################
-# runtime stage – no compiler needed here
+# runtime stage
 ###############################################################################
 FROM julia:1.11.5-bookworm
 
 WORKDIR /app
-COPY --from=build /usr/local/julia /usr/local/julia
-COPY --from=build /app/sbro_sysimage.so /app/
-COPY --from=build /app/http_json_api_loop.jl /app/
 
-ENV JULIA_PROJECT=/app
+# Julia runtime
+COPY --from=build /usr/local/julia /usr/local/julia
+
+# Full depot: packages **and** artifacts
+COPY --from=build /root/.julia /root/.julia
+ENV  JULIA_DEPOT_PATH=/root/.julia
+
+# Project files **and** your source code
+COPY --from=build /app /app
+ENV  JULIA_PROJECT=/app
+
 EXPOSE 8081
 CMD ["julia","--sysimage","sbro_sysimage.so","http_json_api_loop.jl"]

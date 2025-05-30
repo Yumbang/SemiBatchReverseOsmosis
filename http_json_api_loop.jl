@@ -86,7 +86,7 @@ HTTP.register!(ROUTER, "GET", "/render", render_handler)
 
 HTTP.register!(ROUTER, "GET", "/health", health_check_handler)
 
-HTTP.serve(ROUTER, "127.0.0.1", 8081; on_shutdown = cleanup)
+HTTP.serve(ROUTER, "0.0.0.0", 8081; on_shutdown = cleanup)
 
 # ─── Install signal handlers ─────────────────────────────────────────────────
 using Base: Signal, SIGINT, SIGTERM

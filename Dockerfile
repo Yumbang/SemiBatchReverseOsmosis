@@ -30,11 +30,10 @@ FROM julia:1.11.5-bookworm
 # copy Julia itself
 COPY --from=build /usr/local/julia /usr/local/julia
 
-# copy the fully-prepared depot
-COPY --from=build /root/.julia /usr/local/share/julia
-ENV  JULIA_DEPOT_PATH=/usr/local/share/julia
+# copy the depot back to the *same* place it was built
+COPY --from=build /root/.julia /root/.julia
 
-# copy your project
+# no JULIA_DEPOT_PATH override – default already points to /root/.julia
 WORKDIR /app
 COPY --from=build /app /app
 ENV  JULIA_PROJECT=/app
