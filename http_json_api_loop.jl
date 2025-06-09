@@ -1,4 +1,4 @@
-using HTTP, JSON3
+using HTTP, JSON3, Dates
 include("rl_plans/plan_A.jl")
 
 function json_response(payload; status::Integer = 200)
@@ -9,7 +9,7 @@ function json_response(payload; status::Integer = 200)
     )
 end
 
-print("🚀 Starting SBRO environment ... ")
+print("[$(Dates.format(now(), "yy.mm.dd/HH:MM:SS"))] 🚀 Starting SBRO environment ... ")
 sbro_env = initialize_sbro_env(
     ; dt = 30.0, τ_max=86400.0
 )
@@ -18,6 +18,7 @@ println("Done!")
 const ROUTER = HTTP.Router()
 
 function reset_scenario_handler(req::HTTP.Request)
+    @info "[$(Dates.format(now(), "yy.mm.dd/HH:MM:SS"))] Scenario reset requested."
     cfg = JSON3.read(String(req.body))
     
     scenario_condition  = cfg["scenario_condition"]  |> Vector{Float64}
@@ -29,6 +30,7 @@ function reset_scenario_handler(req::HTTP.Request)
 end
 
 function reset_handler(req::HTTP.Request)
+    @info "[$(Dates.format(now(), "yy.mm.dd/HH:MM:SS"))] Environment reset requested."
     cfg = JSON3.read(String(req.body))
     
     initial_condition = cfg["action"]    |> Vector{Float64}
@@ -46,7 +48,30 @@ function reset_handler(req::HTTP.Request)
     return json_response(experience_reset)
 end
 
+function hard_reset_handler(req::HTTP.Request)
+    @info "[$(Dates.format(now(), "yy.mm.dd/HH:MM:SS"))] Environment hard reset requested"
+
+    cfg = JSON3.read(String(req.body))
+
+    if isnothing(cfg["dt"])
+        dt = 30.0
+    else
+        dt = cfg["dt"]
+    end
+
+    if isnothing(cfg["time_max"])
+        τ_max = 86400.0
+    else
+        τ_max = cfg["time_max"]
+    end
+
+    hard_reset!(sbro_env; dt = dt, τ_max = τ_max)
+
+    return HTTP.Response(200, "Environment hard reset.")
+end
+
 function step_handler(req::HTTP.Request)
+    @info "[$(Dates.format(now(), "yy.mm.dd/HH:MM:SS"))] Environment step requested <STEP $(sbro_env.step_cur) ▶ $(sbro_env.step_cur+1)>."
     cfg = JSON3.read(String(req.body))
 
     action = cfg["action"] |> Vector{Float64}
@@ -57,11 +82,9 @@ function step_handler(req::HTTP.Request)
 end
 
 function render_handler(req::HTTP.Request)
-    cfg = JSON3.read(String(req.body))
+    @info "[$(Dates.format(now(), "yy.mm.dd/HH:MM:SS"))] Environment render requested."
 
-    mode = cfg["mode"] |> Symbol
-
-    rendered_env = render(sbro_env; mode=mode)
+    rendered_env = render(sbro_env; mode=:text)
 
     return HTTP.Response(200, rendered_env)
 end
@@ -71,12 +94,14 @@ function health_check_handler(req::HTTP.Request)
 end
 
 function cleanup()
-    @info "Server termination detected. Cleaning up ..."
+    @info "[$(Dates.format(now(), "yy.mm.dd/HH:MM:SS"))] Server termination detected. Cleaning up ..."
     sbro_env = nothing
     return nothing
 end
 
 HTTP.register!(ROUTER, "POST", "/reset_scenario", reset_scenario_handler)
+
+HTTP.register!(ROUTER, "POST", "/hard_reset", hard_reset_handler)
 
 HTTP.register!(ROUTER, "POST", "/reset", reset_handler)
 
@@ -96,7 +121,7 @@ function watch_signal(sig::Int)
     ch = Signal(sig)
     @async while true
         take!(ch)                      # blocks until that OS signal arrives
-        @info "Signal $(sig) received—shutting down HTTP server"
+        @info "[$(Dates.format(now(), "yy.mm.dd/HH:MM:SS"))] Signal $(sig) received—shutting down HTTP server"
         HTTP.close(server)             # start graceful shutdown
         return                         # exit this task
     end
@@ -107,4 +132,4 @@ watch_signal(SIGTERM)                 # `kill` or Docker stop
 
 # ─── Wait for server to finish shutting down ─────────────────────────────────
 wait(server)                          # blocks until `close(server)` is done
-@info "Server has shut down cleanly."
+@info "[$(Dates.format(now(), "yy.mm.dd/HH:MM:SS"))] Server has shut down cleanly."

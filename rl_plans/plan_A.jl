@@ -213,6 +213,10 @@ function reset!(
     return experience
 end
 
+"""
+Step environment with the given action and return the transition.
+Action is [Q₀, R_sp, mode].
+"""
 function step!(
     env::SemiBatchReverseOsmosisEnv,
     action::Vector{Float64}
@@ -305,6 +309,35 @@ function step!(
     ])
 
     return experience
+end
+
+"""
+Hard-reset the environment.
+Designed to call at initialization phase of SBRO gymnasium environment.
+"""
+function hard_reset!(env::SemiBatchReverseOsmosisEnv; dt::Float64, τ_max::Float64)
+    step_max = ceil(Int, τ_max/dt)
+
+    env.episode  = 0
+    env.step_cur = 0
+    env.step_max = step_max - 1
+    env.τ_max    = τ_max
+    env.τ_obj    = nothing
+    env.V_perm_cur = nothing
+    env.V_perm_cycle = nothing
+    env.V_perm_obj = nothing
+    env.C_perm_cur = nothing
+    env.E_total_cur = nothing
+    env.E_total_cycle = nothing
+    env.mode_cur = nothing
+    env.cycle_cur = nothing
+    env.last_u = nothing
+    env.scenarios = nothing
+    env.action = nothing
+    env.state = nothing
+    env.reward = nothing
+
+    return nothing
 end
 
 function render(env::SemiBatchReverseOsmosisEnv; mode=:text)
