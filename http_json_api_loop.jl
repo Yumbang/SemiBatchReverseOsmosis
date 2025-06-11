@@ -12,7 +12,7 @@ end
 print("[$(Dates.format(now(), "yy.mm.dd/HH:MM:SS"))] 🚀 Starting SBRO environment ... ")
 sbro_env = initialize_sbro_env(
     ; dt = 30.0, τ_max=86400.0
-)
+);
 println("Done!")
 
 const ROUTER = HTTP.Router()
@@ -49,7 +49,7 @@ function reset_handler(req::HTTP.Request)
 end
 
 function hard_reset_handler(req::HTTP.Request)
-    @info "[$(Dates.format(now(), "yy.mm.dd/HH:MM:SS"))] Environment hard reset requested"
+    @info "[$(Dates.format(now(), "yy.mm.dd/HH:MM:SS"))] Environment hard reset requested."
 
     cfg = JSON3.read(String(req.body))
 
@@ -68,6 +68,35 @@ function hard_reset_handler(req::HTTP.Request)
     hard_reset!(sbro_env; dt = dt, τ_max = τ_max)
 
     return HTTP.Response(200, "Environment hard reset.")
+end
+
+function update_reward_conf_handler(req::HTTP.Request)
+    @info "[$(Dates.format(now(), "yy.mm.dd/HH:MM:SS"))] Reward configuration update requested."
+
+    cfg = JSON3.read(String(req.body))
+
+    if isnothing(sbro_env.reward_conf)
+        sbro_env.reward_conf = Dict([
+            :penalty_truncation => 1.0,
+            :penalty_τ => 0.01,         # (s)⁻¹
+            :penalty_SEC => (0.005) / 3600.0 / 1000.0,    # (kWh/m³)⁻¹ → (Ws/m³)⁻¹
+            :penalty_conc => 5.0,       # (kg/m³)⁻¹
+            :incentive_V_perm => 0.1,   # (m³)⁻¹
+        ])
+    end
+
+    cfg_dict = Dict(cfg)
+    
+    for new_conf_key ∈ keys(cfg_dict)
+        if !(Symbol(new_conf_key) ∈ keys(sbro_env.reward_conf))
+            @warn "\t$(new_conf_key) was not found in the environment's reward configuration"
+            return HTTP.Response(400, "Environment reward configuration update failed.")
+        end
+        sbro_env.reward_conf[Symbol(new_conf_key)] = Float64(cfg_dict[new_conf_key])
+        @info "\t$(new_conf_key) was updated to $(cfg_dict[new_conf_key])"
+    end
+
+    return HTTP.Response(200, "Environment reward configuration updated.")
 end
 
 function step_handler(req::HTTP.Request)
@@ -102,6 +131,8 @@ end
 HTTP.register!(ROUTER, "POST", "/reset_scenario", reset_scenario_handler)
 
 HTTP.register!(ROUTER, "POST", "/hard_reset", hard_reset_handler)
+
+HTTP.register!(ROUTER, "POST", "/update_reward_conf", update_reward_conf_handler)
 
 HTTP.register!(ROUTER, "POST", "/reset", reset_handler)
 

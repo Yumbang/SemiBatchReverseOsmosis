@@ -65,10 +65,17 @@ function calculate_sparse_reward(
 )
     base_reward = 0.0
     
-    penalty_truncation = 1.0
-    penalty_τ          = 0.01   # (s)⁻¹
-    penalty_SEC        = (0.005) / 3600.0 / 1000.0    # (kWh/m³)⁻¹ → (Ws/m³)⁻¹
-    penalty_conc       = 5.0    # (kg/m³)⁻¹
+    if isnothing(env.reward_conf)
+        penalty_truncation = 1.0
+        penalty_τ          = 0.01   # (s)⁻¹
+        penalty_SEC        = (0.005) / 3600.0 / 1000.0    # (kWh/m³)⁻¹ → (Ws/m³)⁻¹
+        penalty_conc       = 5.0    # (kg/m³)⁻¹
+    else
+        penalty_truncation = env.reward_conf[:penalty_truncation]
+        penalty_τ          = env.reward_conf[:penalty_τ]
+        penalty_SEC        = env.reward_conf[:penalty_SEC]
+        penalty_conc       = env.reward_conf[:penalty_conc]
+    end
 
     # Give an extra penalty if the episode is truncated
     if is_truncated
@@ -97,7 +104,11 @@ function calculate_dense_reward(
     # Give incentive according to permeate volume accomplished during a cycle
     # No matter how much is `calculate_dense_reward` called, total incentive is designed to be same (V_perm_obj)
     # However, because of γ, RL agent may be prompted to accomplish the reward later in the episode.
-    incentive_V_perm = 0.1  # (m³)⁻¹
+    if isnothing(env.reward_conf)
+        incentive_V_perm = 0.1  # (m³)⁻¹
+    else
+        incentive_V_perm = env.reward_conf[:incentive_V_perm]
+    end
 
     base_reward     += incentive_V_perm * env.V_perm_cycle
 

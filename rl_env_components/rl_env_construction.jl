@@ -2,6 +2,7 @@ mutable struct SemiBatchReverseOsmosisEnv
     const sys   :: ODESystem                # Semi-batch RO system (simplified)
     problem     :: ODEProblem               # Semi-batch RO ODE problem
     setp_handle :: SymbolicIndexingInterface.ParameterHookWrapper # Parameter updater
+    reward_conf :: Union{Nothing, Dict{Symbol, Float64}}
     dt          :: Float64                  # dt for each environment step [s]. NOT THAT OF ODE!
     episode     :: Int                      # episode counter
     step_cur    :: Int                      # current step counter
@@ -71,6 +72,7 @@ function initialize_sbro_env(;dt::Float64, τ_max::Float64)
         simple_sbro,
         sbro_prob,
         setp_handle,
+        nothing,
         dt,
         0,          # Every reset!() call increase episode by 1. I.e., episode must start with 1.
         0,          # Every step!() call increase step_cur by 1.
