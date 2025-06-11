@@ -82,11 +82,12 @@ function update_reward_conf_handler(req::HTTP.Request)
             :penalty_SEC => (0.005) / 3600.0 / 1000.0,    # (kWh/m³)⁻¹ → (Ws/m³)⁻¹
             :penalty_conc => 5.0,       # (kg/m³)⁻¹
             :incentive_V_perm => 0.1,   # (m³)⁻¹
+            :penalty_V_disp => 0.1,   # (m³)⁻¹
         ])
     end
 
     cfg_dict = Dict(cfg)
-    
+
     for new_conf_key ∈ keys(cfg_dict)
         if !(Symbol(new_conf_key) ∈ keys(sbro_env.reward_conf))
             @warn "\t$(new_conf_key) was not found in the environment's reward configuration"

@@ -106,11 +106,13 @@ function calculate_dense_reward(
     # However, because of γ, RL agent may be prompted to accomplish the reward later in the episode.
     if isnothing(env.reward_conf)
         incentive_V_perm = 0.1  # (m³)⁻¹
+        penalty_V_disp = 0.1    # (m³)⁻¹
     else
         incentive_V_perm = env.reward_conf[:incentive_V_perm]
+        penalty_V_disp   = env.reward_conf[:penalty_V_disp]
     end
 
-    base_reward     += incentive_V_perm * env.V_perm_cycle
+    base_reward += incentive_V_perm * env.V_perm_cycle - penalty_V_disp * env.V_disp
 
     return base_reward
 end
@@ -208,6 +210,7 @@ function reset!(
     env.C_perm_cur      = mean([env.C_perm_cur, permeate[2]], weights([env.V_perm_cur, permeate[1]]))
     env.V_perm_cur     += permeate[1]
     env.V_perm_cycle   += permeate[1]
+    env.V_disp         += base_observation[7] * env.dt / 3600.0
     env.E_total_cur    += e_total
     env.E_total_cycle  += e_total
     env.mode_cur        = :CC
@@ -279,6 +282,7 @@ function step!(
     env.C_perm_cur      = mean([env.C_perm_cur, permeate[2]], weights([env.V_perm_cur, permeate[1]]))
     env.V_perm_cur     += permeate[1]
     env.V_perm_cycle   += permeate[1]
+    env.V_disp         += base_observation[7] * env.dt / 3600.0
     env.E_total_cur    += e_total
     env.E_total_cycle  += e_total
 

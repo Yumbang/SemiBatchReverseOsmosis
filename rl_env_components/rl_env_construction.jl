@@ -12,6 +12,7 @@ mutable struct SemiBatchReverseOsmosisEnv
     V_perm_cur  :: Union{Nothing, Float64}  # current cumulative permeate volume [m³]
     V_perm_cycle:: Union{Nothing, Float64}  # cycle cumulative permeate volume [m³]
     V_perm_obj  :: Union{Nothing, Float64}  # objective permeate volume [m³]
+    V_disp      :: Union{Nothing, Float64}  # disposed brine volume [m³]
     C_perm_cur  :: Union{Nothing, Float64}  # current cumulative permeate concentration [kg/m³]
     E_total_cur :: Union{Nothing, Float64}
     E_total_cycle :: Union{Nothing, Float64}
@@ -82,6 +83,7 @@ function initialize_sbro_env(;dt::Float64, τ_max::Float64)
         nothing,    # V_perm_cur
         nothing,    # V_perm_cycle
         nothing,    # V_perm_obj
+        nothing,    # V_disp
         nothing,    # C_perm_cur
         nothing,    # E_total_cur
         nothing,    # E_total_cycle
