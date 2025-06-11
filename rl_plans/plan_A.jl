@@ -159,6 +159,7 @@ function reset!(
     env.step_cur   = 0
     env.V_perm_cur = 0.0
     env.V_perm_cycle = 0.0
+    env.V_disp = 0.0
     env.C_perm_cur = 0.0
     env.E_total_cur = 0.0
     env.E_total_cycle = 0.0
@@ -249,6 +250,7 @@ function step!(
 
     if is_purging_done
         env.V_perm_cycle  = 0.0
+        env.V_disp = 0.0
         env.E_total_cycle = 0.0
         env.cycle_cur += 1
     end
@@ -333,6 +335,7 @@ Designed to call at initialization phase of SBRO gymnasium environment.
 function hard_reset!(env::SemiBatchReverseOsmosisEnv; dt::Float64, τ_max::Float64)
     step_max = ceil(Int, τ_max/dt)
 
+    env.reward_conf = nothing
     env.episode  = 0
     env.step_cur = 0
     env.step_max = step_max - 1
@@ -341,6 +344,7 @@ function hard_reset!(env::SemiBatchReverseOsmosisEnv; dt::Float64, τ_max::Float
     env.V_perm_cur = nothing
     env.V_perm_cycle = nothing
     env.V_perm_obj = nothing
+    env.V_disp = nothing
     env.C_perm_cur = nothing
     env.E_total_cur = nothing
     env.E_total_cycle = nothing
