@@ -101,7 +101,7 @@ function update_reward_conf_handler(req::HTTP.Request)
 end
 
 function step_handler(req::HTTP.Request)
-    @info "[$(Dates.format(now(), "yy.mm.dd/HH:MM:SS"))] Environment step requested <STEP $(sbro_env.step_cur) ▶ $(sbro_env.step_cur+1)>."
+    # @info "[$(Dates.format(now(), "yy.mm.dd/HH:MM:SS"))] Environment step requested <STEP $(sbro_env.step_cur) ▶ $(sbro_env.step_cur+1)>."
     cfg = JSON3.read(String(req.body))
 
     action = cfg["action"] |> Vector{Float64}

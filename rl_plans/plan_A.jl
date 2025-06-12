@@ -67,12 +67,10 @@ function calculate_sparse_reward(
     
     if isnothing(env.reward_conf)
         penalty_truncation = 1.0
-        penalty_τ          = 0.01   # (s)⁻¹
         penalty_SEC        = (0.005) / 3600.0 / 1000.0    # (kWh/m³)⁻¹ → (Ws/m³)⁻¹
         penalty_conc       = 5.0    # (kg/m³)⁻¹
     else
         penalty_truncation = env.reward_conf[:penalty_truncation]
-        penalty_τ          = env.reward_conf[:penalty_τ]
         penalty_SEC        = env.reward_conf[:penalty_SEC]
         penalty_conc       = env.reward_conf[:penalty_conc]
     end
@@ -83,27 +81,28 @@ function calculate_sparse_reward(
     end
 
     # Give penalty according to exceeded time and SEC
-    τ_exceed     = max(0.0, env.problem.tspan[2] - env.τ_obj)
+    # τ_exceed     = max(0.0, env.problem.tspan[2] - env.τ_obj) Moved to calculate_dense_reward (0.1.4)
     SEC_total    = env.E_total_cur / env.V_perm_cur
     conc_exceed  = max(0.0, env.C_perm_cur - 0.01)
     
-    base_reward -= penalty_τ    * τ_exceed +
-                   penalty_SEC  * SEC_total +
+    # base_reward -= penalty_τ    * τ_exceed +
+    base_reward -= penalty_SEC  * SEC_total +
                    penalty_conc * conc_exceed
 
-    @info "Penalty terms" τ_exceed SEC_total conc_exceed
+    @info "Penalty terms" (penalty_SEC * SEC_total) (penalty_conc * conc_exceed)
 
     return base_reward
 end
 
-function calculate_dense_reward(
+function calculate_cycle_reward(
     env::SemiBatchReverseOsmosisEnv
 )
     base_reward = 0.0
 
     # Give incentive according to permeate volume accomplished during a cycle
-    # No matter how much is `calculate_dense_reward` called, total incentive is designed to be same (V_perm_obj)
+    # No matter how much is `calculate_cycle_reward` called, total incentive is designed to be same (V_perm_obj)
     # However, because of γ, RL agent may be prompted to accomplish the reward later in the episode.
+    # Penalty is given with to the volume of disposed brine, promoting high-recovery operation.
     if isnothing(env.reward_conf)
         incentive_V_perm = 0.1  # (m³)⁻¹
         penalty_V_disp = 0.1    # (m³)⁻¹
@@ -113,6 +112,24 @@ function calculate_dense_reward(
     end
 
     base_reward += incentive_V_perm * env.V_perm_cycle - penalty_V_disp * env.V_disp
+
+    return base_reward
+end
+
+function calculate_dense_reward(
+    env::SemiBatchReverseOsmosisEnv
+)
+    if isnothing(env.reward_conf)
+        penalty_τ          = 1e-6   # (s)⁻¹
+    else
+        penalty_τ          = env.reward_conf[:penalty_τ]
+    end
+
+    base_reward = 0.0
+
+    if (env.problem.tspan[2] - env.τ_obj) > 0.0
+        base_reward -= penalty_τ
+    end
 
     return base_reward
 end
@@ -300,19 +317,25 @@ function step!(
     if (is_terminated | is_truncated)
         env.episode  += 1
         sparse_reward = calculate_sparse_reward(env, is_truncated)
-        dense_reward  = calculate_dense_reward(env)
-        reward       += sparse_reward + dense_reward
+        cycle_reward  = calculate_cycle_reward(env)
+        reward       += sparse_reward + cycle_reward
+        @info "Episode $(env.episode) completed" (env.V_perm_cur/env.V_perm_obj) env.step_cur env.cycle_cur
     else
         if is_CC_done
-            dense_reward = calculate_dense_reward(env)
-            reward += dense_reward
+            cycle_reward = calculate_cycle_reward(env)
+            reward += cycle_reward
         end
     end
+
+    dense_reward = calculate_dense_reward(env)
+    reward += dense_reward
 
     env.mode_cur = mode_temp
 
     observation  = vcat(base_observation, [env.τ_obj - env.problem.tspan[2], env.V_perm_obj - env.V_perm_cur])
     env.state    = observation
+
+    check_observation_sanity(observation)
 
     env.reward   = reward    
 
@@ -385,4 +408,12 @@ E_total_cycle [Ws]: $(env.E_total_cycle)"""
     else
         return nothing
     end
+end
+
+function check_observation_sanity(observation)
+    greater_than_zero = all(observation[1:9] .> -1e-5)
+    @assert greater_than_zero "Negative output detected ($observation)." 
+    # @assert false "Negative output detected."
+
+    return nothing
 end
