@@ -26,12 +26,14 @@ function process_solution(
     extracted_observations       = solutions[[env.sys.P_m_in,
                                               env.sys.P_m_out,
                                               env.sys.C_perm,
-                                              env.sys.SEC]]
+                                              env.sys.SEC,
+                                              env.sys.Q_feed]]
 
     P_m_in  = [extracted_observation[1] for extracted_observation in extracted_observations]
     P_m_out = [extracted_observation[2] for extracted_observation in extracted_observations]
     C_perm  = [extracted_observation[3] for extracted_observation in extracted_observations]
     SEC     = [extracted_observation[4] for extracted_observation in extracted_observations]
+    Q_feed  = [extracted_observation[5] for extracted_observation in extracted_observations]
 
     # Construct base obervation variable
     base_observation = [
@@ -47,16 +49,16 @@ function process_solution(
     ]
 
     # Prepare processed returns
-    τ_passed = env.dt
     
     e_total  = mean(SEC[1:end-1], weights(diff(solutions.t))) * Q_perm / 3600 * env.dt 
     # SEC_mean = mean(SEC[1:end-1], weights(diff(solutions.t)))
 
     V_perm_mixed = Q_perm / 3600 * env.dt
+    V_fresh_feed = mean(Q_feed) / 3600 * env.dt
     C_perm_mixed = mean(C_perm[1:end-1], weights(diff(solutions.t)))
     permeate     = [V_perm_mixed, C_perm_mixed]
 
-    return (base_observation, τ_passed, permeate, e_total)
+    return (base_observation, V_fresh_feed, permeate, e_total)
 end
 
 function calculate_sparse_reward(
@@ -83,7 +85,7 @@ function calculate_sparse_reward(
     # Give penalty according to exceeded time and SEC
     # τ_exceed     = max(0.0, env.problem.tspan[2] - env.τ_obj) Moved to calculate_dense_reward (0.1.4)
     SEC_total    = env.E_total_cur / env.V_perm_cur
-    conc_exceed  = max(0.0, env.C_perm_cur - 0.01)
+    conc_exceed  = max(0.0, env.C_perm_cur - 0.025)
     
     # base_reward -= penalty_τ    * τ_exceed +
     base_reward -= penalty_SEC  * SEC_total +
@@ -95,7 +97,7 @@ function calculate_sparse_reward(
 end
 
 function calculate_cycle_reward(
-    env::SemiBatchReverseOsmosisEnv
+    env::SemiBatchReverseOsmosisEnv, V_fresh_feed::Float64
 )
     base_reward = 0.0
 
@@ -106,12 +108,14 @@ function calculate_cycle_reward(
     if isnothing(env.reward_conf)
         incentive_V_perm = 0.1  # (m³)⁻¹
         penalty_V_disp = 0.1    # (m³)⁻¹
+        penalty_V_feed = 0.1    # (m³)⁻¹
     else
         incentive_V_perm = env.reward_conf[:incentive_V_perm]
-        penalty_V_disp   = env.reward_conf[:penalty_V_disp]
+        penalty_V_disp   = env.reward_conf[:penalty_V_feed]
+        penalty_V_feed   = env.reward_conf[:penalty_V_feed]
     end
 
-    base_reward += incentive_V_perm * env.V_perm_cycle - penalty_V_disp * env.V_disp
+    base_reward += incentive_V_perm * env.V_perm_cycle - penalty_V_disp * env.V_disp - penalty_V_feed * V_fresh_feed
 
     return base_reward
 end
@@ -121,14 +125,21 @@ function calculate_dense_reward(
 )
     if isnothing(env.reward_conf)
         penalty_τ          = 1e-6   # (s)⁻¹
+        penalty_V_perm     = 1e-3   # (-)
     else
         penalty_τ          = env.reward_conf[:penalty_τ]
+        penalty_V_perm     = env.reward_conf[:penalty_V_perm]
     end
 
     base_reward = 0.0
 
     if (env.problem.tspan[2] - env.τ_obj) > 0.0
         base_reward -= penalty_τ
+    end
+
+    if (env.V_perm_cur > env.V_perm_obj)
+        # base_reward -= (env.V_perm_cur - env.V_perm_obj)
+        base_reward -= penalty_V_perm
     end
 
     return base_reward
@@ -293,7 +304,7 @@ function step!(
     sol = solve(env.problem, DP5())
 
     # Process solution into proper observation & reward    
-    base_observation, _, permeate, e_total = process_solution(env, sol)
+    base_observation, V_fresh_feed, permeate, e_total = process_solution(env, sol)
 
     env.last_u = deepcopy(sol.u[end])
 
@@ -327,7 +338,7 @@ function step!(
         end
     end
 
-    dense_reward = calculate_dense_reward(env)
+    dense_reward = calculate_dense_reward(env, V_fresh_feed)
     reward += dense_reward
 
     env.mode_cur = mode_temp
