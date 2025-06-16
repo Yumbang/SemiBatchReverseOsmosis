@@ -78,6 +78,7 @@ function update_reward_conf_handler(req::HTTP.Request)
     if isnothing(sbro_env.reward_conf)
         sbro_env.reward_conf = Dict([
             :penalty_truncation => 1.0,
+            :incentive_termination => 2.5,
             :penalty_τ => 0.01,         # (s)⁻¹
             :penalty_SEC => (0.005) / 3600.0 / 1000.0,    # (kWh/m³)⁻¹ → (Ws/m³)⁻¹
             :penalty_conc => 5.0,       # (kg/m³)⁻¹

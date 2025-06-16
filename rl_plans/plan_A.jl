@@ -71,15 +71,22 @@ function calculate_sparse_reward(
         penalty_truncation = 1.0
         penalty_SEC        = (0.005) / 3600.0 / 1000.0    # (kWh/m³)⁻¹ → (Ws/m³)⁻¹
         penalty_conc       = 5.0    # (kg/m³)⁻¹
+        incentive_termination = 2.5
     else
         penalty_truncation = env.reward_conf[:penalty_truncation]
         penalty_SEC        = env.reward_conf[:penalty_SEC]
         penalty_conc       = env.reward_conf[:penalty_conc]
+        incentive_termination = env.reward_conf[:incentive_termination]
     end
 
     # Give an extra penalty if the episode is truncated
     if is_truncated
         base_reward -= penalty_truncation
+    else
+        # Give an extra incentive if the agent completed the mission (Produce given amount of water, in given time!)
+        if (env.problem.tspan[2] - env.τ_obj) > 0.0
+            base_reward += incentive_termination
+        end
     end
 
     # Give penalty according to exceeded time and SEC
@@ -97,7 +104,7 @@ function calculate_sparse_reward(
 end
 
 function calculate_cycle_reward(
-    env::SemiBatchReverseOsmosisEnv, V_fresh_feed::Float64
+    env::SemiBatchReverseOsmosisEnv
 )
     base_reward = 0.0
 
@@ -108,27 +115,29 @@ function calculate_cycle_reward(
     if isnothing(env.reward_conf)
         incentive_V_perm = 0.1  # (m³)⁻¹
         penalty_V_disp = 0.1    # (m³)⁻¹
-        penalty_V_feed = 0.1    # (m³)⁻¹
+        
     else
         incentive_V_perm = env.reward_conf[:incentive_V_perm]
-        penalty_V_disp   = env.reward_conf[:penalty_V_feed]
-        penalty_V_feed   = env.reward_conf[:penalty_V_feed]
+        penalty_V_disp   = env.reward_conf[:penalty_V_disp]
+        
     end
 
-    base_reward += incentive_V_perm * env.V_perm_cycle - penalty_V_disp * env.V_disp - penalty_V_feed * V_fresh_feed
+    base_reward += incentive_V_perm * env.V_perm_cycle - penalty_V_disp * env.V_disp
 
     return base_reward
 end
 
 function calculate_dense_reward(
-    env::SemiBatchReverseOsmosisEnv
+    env::SemiBatchReverseOsmosisEnv, V_fresh_feed::Float64
 )
     if isnothing(env.reward_conf)
         penalty_τ          = 1e-6   # (s)⁻¹
         penalty_V_perm     = 1e-3   # (-)
+        penalty_V_feed     = 0.1    # (m³)⁻¹
     else
         penalty_τ          = env.reward_conf[:penalty_τ]
         penalty_V_perm     = env.reward_conf[:penalty_V_perm]
+        penalty_V_feed   = env.reward_conf[:penalty_V_feed]
     end
 
     base_reward = 0.0
@@ -141,6 +150,8 @@ function calculate_dense_reward(
         # base_reward -= (env.V_perm_cur - env.V_perm_obj)
         base_reward -= penalty_V_perm
     end
+
+    base_reward -= penalty_V_feed * V_fresh_feed
 
     return base_reward
 end
