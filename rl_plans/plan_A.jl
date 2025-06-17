@@ -71,7 +71,7 @@ function calculate_sparse_reward(
         penalty_truncation = 1.0
         penalty_SEC        = (0.005) / 3600.0 / 1000.0    # (kWh/m³)⁻¹ → (Ws/m³)⁻¹
         penalty_conc       = 5.0    # (kg/m³)⁻¹
-        incentive_termination = 2.5
+        incentive_termination = 1e-4
     else
         penalty_truncation = env.reward_conf[:penalty_truncation]
         penalty_SEC        = env.reward_conf[:penalty_SEC]
@@ -84,7 +84,8 @@ function calculate_sparse_reward(
         base_reward -= penalty_truncation
     else
         # Give an extra incentive if the agent completed the mission (Produce given amount of water, in given time!)
-        if (env.problem.tspan[2] - env.τ_obj) > 0.0
+        if (env.problem.tspan[2] - env.τ_obj) < 0.0
+            # base_reward += incentive_termination * (env.τ_obj - env.problem.tspan[2])
             base_reward += incentive_termination
         end
     end
@@ -143,7 +144,7 @@ function calculate_dense_reward(
     base_reward = 0.0
 
     if (env.problem.tspan[2] - env.τ_obj) > 0.0
-        base_reward -= penalty_τ
+        base_reward -= penalty_τ * env.dt
     end
 
     if (env.V_perm_cur > env.V_perm_obj)
