@@ -69,12 +69,12 @@ function calculate_sparse_reward(
     
     if isnothing(env.reward_conf)
         penalty_truncation = 1.0
-        penalty_SEC        = (0.005) / 3600.0 / 1000.0    # (kWh/m³)⁻¹ → (Ws/m³)⁻¹
+        # penalty_SEC        = (0.005) / 3600.0 / 1000.0    # (kWh/m³)⁻¹ → (Ws/m³)⁻¹
         penalty_conc       = 5.0    # (kg/m³)⁻¹
         incentive_termination = 1e-4
     else
         penalty_truncation = env.reward_conf[:penalty_truncation]
-        penalty_SEC        = env.reward_conf[:penalty_SEC]
+        # penalty_SEC        = env.reward_conf[:penalty_SEC]
         penalty_conc       = env.reward_conf[:penalty_conc]
         incentive_termination = env.reward_conf[:incentive_termination]
     end
@@ -92,8 +92,8 @@ function calculate_sparse_reward(
 
     # Give penalty according to exceeded time and SEC
     # τ_exceed     = max(0.0, env.problem.tspan[2] - env.τ_obj) Moved to calculate_dense_reward (0.1.4)
-    SEC_total    = env.E_total_cur / env.V_perm_cur
-    conc_exceed  = max(0.0, env.C_perm_cur - 0.025)
+    # SEC_total    = env.E_total_cur / env.V_perm_cur
+    conc_exceed  = max(0.0, env.C_perm_cur - 0.012)
     
     # base_reward -= penalty_τ    * τ_exceed +
     base_reward -= penalty_SEC  * SEC_total +
@@ -129,30 +129,57 @@ function calculate_cycle_reward(
 end
 
 function calculate_dense_reward(
-    env::SemiBatchReverseOsmosisEnv, V_fresh_feed::Float64
+    env::SemiBatchReverseOsmosisEnv, V_fresh_feed::Float64, last_action::Vector{Float64}, e_total::Float64
 )
     if isnothing(env.reward_conf)
         penalty_τ          = 1e-6   # (s)⁻¹
         penalty_V_perm     = 1e-3   # (-)
         penalty_V_feed     = 0.1    # (m³)⁻¹
+        penalty_SEC        = (0.005) / 3600.0 / 1000.0    # (kWh/m³)⁻¹ → (Ws/m³)⁻¹
+        penalty_rapid_change = 0.1 / env.dt
     else
         penalty_τ          = env.reward_conf[:penalty_τ]
         penalty_V_perm     = env.reward_conf[:penalty_V_perm]
-        penalty_V_feed   = env.reward_conf[:penalty_V_feed]
+        penalty_V_feed     = env.reward_conf[:penalty_V_feed]
+        penalty_SEC        = env.reward_conf[:penalty_SEC]
+        penalty_rapid_change = env.reward_conf[:penalty_rapid_change]
     end
 
+    # Base reward
     base_reward = 0.0
 
+    # Punctuality penalty
     if (env.problem.tspan[2] - env.τ_obj) > 0.0
-        base_reward -= penalty_τ * env.dt
+        # base_reward -= penalty_τ * env.dt
+        base_reward -= penalty_τ * (env.problem.tspan[2] - env.τ_obj)
     end
 
+    # Overproduction penalty
     if (env.V_perm_cur > env.V_perm_obj)
         # base_reward -= (env.V_perm_cur - env.V_perm_obj)
         base_reward -= penalty_V_perm
     end
 
+    # Fresh feed usage penalty
     base_reward -= penalty_V_feed * V_fresh_feed
+
+    # Energy usage penalty
+    base_reward -= penalty_SEC * e_total
+    
+    # Rapid change penalty. TODO: Adjust thresholds
+    rapid_change_threshold = [
+        0.25,
+        0.05,
+        0.0,
+    ]
+
+    rapid_change_weight = weights([
+        1.0/5.0, 1.0/1.0, 1.0/2.5
+    ])
+
+    diff_action = max.(abs.(env.action .- last_action) .- rapid_change_threshold, 0.0)
+
+    base_reward -= mean(diff_action, rapid_change_weight) * penalty_rapid_change * env.dt
 
     return base_reward
 end
@@ -281,7 +308,8 @@ function step!(
     # Parameter & Initial condition generation
     Q₀_new, R_sp_new, mode = action
 
-    env.action = action
+    last_action = copy(env.action)
+    env.action  = action
     
     mode_temp       = (mode == 1.0) ? (:CC) : (:purge)
 
@@ -350,7 +378,7 @@ function step!(
         end
     end
 
-    dense_reward = calculate_dense_reward(env, V_fresh_feed)
+    dense_reward = calculate_dense_reward(env, V_fresh_feed, last_action, e_total)
     reward += dense_reward
 
     env.mode_cur = mode_temp

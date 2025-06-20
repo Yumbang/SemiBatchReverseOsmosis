@@ -86,6 +86,7 @@ function update_reward_conf_handler(req::HTTP.Request)
             :penalty_V_disp => 0.1,     # (m³)⁻¹
             :penalty_V_feed => 0.1,     # (m³)⁻¹
             :penalty_V_perm => 0.05,    # (m³)⁻¹
+            :penalty_rapid_change => 0.1 / 60.0,
         ])
     end
 
