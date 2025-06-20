@@ -46,7 +46,7 @@ function default_parameters(sys; C_feed, T_feed, Q₀=5.0, R_sp=0.5)
         sys.C_feed      => C_feed,
         sys.T_feed      => T_feed,
         sys.R_sp        => R_sp,
-        sys.Rejection   => 0.99
+        sys.Rejection   => 0.995
     ]
 
     sbro_vars = [
@@ -63,7 +63,7 @@ end
 """
 Initialize a semi-batch RO differential equation problem, starting from t = 0.0 s
 
-sys: SBRO system (original or simplified << RECOMMENDED!)
+sys: SBRO system (original or *simplified* << RECOMMENDED!)
 system_parameters: SBRO system parameters map
 initial_variables: SBRO ODE problem's initial variables vector
 """
